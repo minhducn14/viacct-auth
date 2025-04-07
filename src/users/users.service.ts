@@ -38,5 +38,9 @@ export class UsersService {
     delete(id: number): Promise<void> {
         return this.repo.delete(id).then(() => { });
     }
+
+    getProfile(user: User): Promise<User | null> {
+        return this.repo.findOne({ where: { id: user.id }, select: ['id', 'company', 'firstName', 'lastName', 'username', 'email', 'phone'] });
+    }
 }
 
