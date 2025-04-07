@@ -1,6 +1,7 @@
 import { RefreshToken } from 'src/refresh-token/refresh-token.entity';
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany, BeforeInsert, BeforeUpdate } from 'typeorm';
 import { Exclude } from 'class-transformer';
+import { BadRequestException } from '@nestjs/common';
 
 @Entity()
 export class User {
@@ -46,4 +47,16 @@ export class User {
     @Exclude()
     @OneToMany(() => RefreshToken, token => token.user)
     refreshTokens: RefreshToken[];
+
+    @BeforeInsert()
+    @BeforeUpdate()
+    validateAuthenticationMethod() {
+        if (this.googleId && this.password) {
+            throw new BadRequestException('Fail to save user');
+        }
+
+        if (!this.googleId && !this.password) {
+            throw new BadRequestException('Fail to save user');
+        }
+    }
 }
