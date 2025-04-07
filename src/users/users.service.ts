@@ -27,11 +27,11 @@ export class UsersService {
         return this.repo.find();
     }
 
-    create(user: User): Promise<User> {
+    create(user: Partial<User>): Promise<User> {
         return this.repo.save(user);
     }
 
-    update(user: User): Promise<User> {
+    update(user: Partial<User>): Promise<User> {
         return this.repo.save(user);
     }
 

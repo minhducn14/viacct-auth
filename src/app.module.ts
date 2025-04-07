@@ -4,8 +4,13 @@ import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { ConfigModule } from '@nestjs/config';
+import { RefreshTokenModule } from './refresh-token/refresh-token.module';
+import { MailService } from './mail/mail.service';
+import { MailModule } from './mail/mail.module';
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot({
       type: 'mysql',
       host: 'localhost',
@@ -18,6 +23,9 @@ import { AuthModule } from './auth/auth.module';
     }),
     UsersModule,
     AuthModule,
+    RefreshTokenModule,
+    MailModule,
   ],
+  providers: [MailService],
 })
 export class AppModule { }
