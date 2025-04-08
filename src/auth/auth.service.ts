@@ -36,43 +36,39 @@ export class AuthService {
     }
 
     async register(dto: RegisterDto, userAgent: string) {
-        try {
-            const { email, username, password, confirmPassword, ...rest } = dto;
+        const { email, username, password, confirmPassword, ...rest } = dto;
 
-            // Kiểm tra email và username đã được sử dụng hay chưa
-            const emailTaken = await this.usersService.findByEmail(email);
-            const usernameTaken = await this.usersService.findByUsername(username);
-            if (emailTaken || usernameTaken) {
-                throw new ConflictException('Email or username already used');
-            }
-
-            // Kiểm tra mật khẩu và xác nhận mật khẩu có khớp nhau không
-            if (password !== confirmPassword) {
-                throw new BadRequestException('Passwords do not match');
-            }
-
-            // Hash password
-            const hashed = await bcrypt.hash(password, 10);
-            const user = await this.usersService.create({
-                ...rest,
-                email,
-                username,
-                password: hashed,
-                isEmailVerified: false,
-                timeRevoke: new Date(0),
-            });
-
-            // Nếu không tạo được user thì ném lỗi
-            if (!user) {
-                throw new BadRequestException('Failed to create user');
-            }
-
-            // Gửi email xác minh
-            return await this.sendVerificationEmail(user);
-        } catch (err) {
-            this.logger.error('Error registering user', err);
-            throw new BadRequestException('Failed to register user');
+        // Kiểm tra email và username đã được sử dụng hay chưa
+        const emailTaken = await this.usersService.findByEmail(email);
+        const usernameTaken = await this.usersService.findByUsername(username);
+        if (emailTaken || usernameTaken) {
+            throw new ConflictException('Email or username already used');
         }
+
+        // Kiểm tra mật khẩu và xác nhận mật khẩu có khớp nhau không
+        if (password !== confirmPassword) {
+            throw new BadRequestException('Passwords do not match');
+        }
+
+        // Hash password
+        const hashed = await bcrypt.hash(password, 10);
+        const user = await this.usersService.create({
+            ...rest,
+            email,
+            username,
+            password: hashed,
+            isEmailVerified: false,
+            timeRevoke: new Date(0),
+        });
+
+        // Nếu không tạo được user thì ném lỗi
+        if (!user) {
+            throw new BadRequestException('Failed to create user');
+        }
+
+        // Gửi email xác minh
+        return await this.sendVerificationEmail(user);
+
     }
 
     private async sendVerificationEmail(user: User) {
@@ -98,7 +94,7 @@ export class AuthService {
                 { secret: process.env.JWT_EMAIL_SECRET, expiresIn: EMAIL_TOKEN_EXP },
             );
             // Tạo link xác minh email
-            const verifyUrl = `${process.env.FRONTEND_URL}/auth/verify-email?token=${token}`;
+            const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
 
             // Gửi email xác minh
             await this.mailService.sendVerificationEmail(
@@ -242,12 +238,12 @@ export class AuthService {
     }
 
     private async validateCredentials(username: string, password: string): Promise<User> {
-        const user = await this.usersService.findByUsername(username);
-        if (!user) throw new NotFoundException('User not found');
+        const user = await this.usersService.findByUsername(username) || await this.usersService.findByEmail(username);
+        if (!user) throw new UnauthorizedException('Unauthorized');
         if (!user.password) throw new UnauthorizedException('Unauthorized');
 
         const currentTime = new Date();
-        if (user.timeRevoke > currentTime) throw new UnauthorizedException('User is revoked');
+        if (user.timeRevoke > currentTime) throw new UnauthorizedException('Unauthorized');
         if (!user.isEmailVerified) throw new UnauthorizedException('User is not verified');
 
         const isMatch = await bcrypt.compare(password, user.password);
@@ -268,4 +264,29 @@ export class AuthService {
             throw new UnauthorizedException('User is not verified');
         }
     }
+
+
+    async refreshToken(user: User, refreshToken: string, userAgent: string) {
+        // Kiểm tra refresh token có hợp lệ không
+        const token = await this.refreshTokenService.findByToken(user, refreshToken);
+        if (!token) {
+            throw new UnauthorizedException('Invalid refresh token');
+        }
+
+        // Kiểm tra xem refresh token có thuộc về user không
+        if (token.user.id !== user.id) {
+            throw new UnauthorizedException('Invalid refresh token for this user');
+        }
+
+        // Kiểm tra thời gian hết hạn của refresh token
+        const currentTime = new Date();
+        if (token.expiredAt < currentTime) {
+            throw new UnauthorizedException('Refresh token expired');
+        }
+
+        // Tạo access token và refresh token mới
+        const tokens = await this.generateTokens(user, userAgent);
+        return tokens;
+    }
+
 }

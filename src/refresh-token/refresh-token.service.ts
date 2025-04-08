@@ -48,4 +48,12 @@ export class RefreshTokenService {
     async findByDevice(user: User, device: string) {
         return this.repo.findOne({ where: { user, device } });
     }
+
+    async findByToken(user: User, token: string) {
+        const rt = await this.repo.findOne({ where: { user } });
+        if (!rt) return false;
+        const valid = await bcrypt.compare(token, rt.hashedToken);
+        if (!valid) return false;
+        return rt;
+    }
 }

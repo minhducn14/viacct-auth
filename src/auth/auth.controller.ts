@@ -8,7 +8,9 @@ import {
     NotFoundException,
     Post,
     Query,
-    UnauthorizedException
+    Req,
+    UnauthorizedException,
+    UseGuards
 } from '@nestjs/common';
 import { RegisterDto } from './dto/register.dto';
 import { UsersService } from 'src/users/users.service';
@@ -21,6 +23,8 @@ import { MailService } from 'src/mail/mail.service';
 import { LoginDto } from './dto/login.dto';
 import { instanceToPlain } from 'class-transformer';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt/jwt.guard';
+import { Request } from 'express';
 
 const ACCESS_TOKEN_EXP = '15m';
 const REFRESH_TOKEN_EXP = '7d';
@@ -63,9 +67,23 @@ export class AuthController {
     }
 
 
-    @Get('verify-email')
-    async verifyEmail(@Query('token') token: string, @Headers('user-agent') userAgent: string) {
-        const response = await this.authService.verifyEmail(token, userAgent);
+    @Post('verify-email')
+    async verifyEmail(@Body() body: { token: string }, @Headers('user-agent') userAgent: string) {
+        const response = await this.authService.verifyEmail(body.token, userAgent);
+        return response;
+    }
+
+
+
+    @UseGuards(JwtAuthGuard)
+    @Post('refresh-token')
+    async refreshToken(@Req() req: Request, @Headers('user-agent') userAgent: string) {
+        const user = req.user as User;
+        const authHeader = req.headers['authorization'];
+        if (!authHeader) {
+            throw new UnauthorizedException('Authorization header is missing');
+        }
+        const response = await this.authService.refreshToken(user, authHeader, userAgent);
         return response;
     }
 
